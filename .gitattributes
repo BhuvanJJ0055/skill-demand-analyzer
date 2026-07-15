@@ -1,0 +1,10 @@
+# Set the default behavior to automatically normalize line endings
+* text=auto
+
+# Force LF line endings for notebooks, source code, data, and docs to avoid Windows CRLF conversion warnings
+*.ipynb text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.csv text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
