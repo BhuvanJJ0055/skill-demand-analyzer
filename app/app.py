@@ -68,4 +68,12 @@ if st.button("Get Recommendations"):
         st.write(f"- **{skill}** — appears in {pct:.0f}% of {role_choice} postings")
 
 st.markdown("---")
+with st.expander("ℹ️ About this data & limitations"):
+    st.markdown("""
+    - **Data source:** 453 real LinkedIn job postings (Data Analyst & Data Scientist roles), scraped April–June 2025.
+    - **Skill extraction:** Skills are detected via keyword matching against a curated taxonomy of 51 common data tools and concepts — this may miss skills phrased unusually or not yet in the taxonomy.
+    - **~90% of descriptions include a "Show more" marker**, suggesting some postings may have been truncated during the original scrape — a small number of postings (8/453) returned no detected skills as a result.
+    - **Snapshot only:** this reflects a 3-month window in 2025 and does not capture real-time market changes.
+    """)
+
 st.caption(f"Based on {len(df)} real job postings (Apr-Jun 2025, LinkedIn). Data may not reflect current market conditions.")
