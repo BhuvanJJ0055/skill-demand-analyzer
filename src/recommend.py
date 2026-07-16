@@ -29,6 +29,26 @@ def recommend_skills(user_skills, role_category, da_counts, ds_counts, top_n=5):
     
     return missing_skills[:top_n]
 
+def skill_gap_summary(user_skills, role_category, da_counts, ds_counts, top_n=8):
+    """
+    Returns a summary of how many of the role's top N skills the user already has.
+    """
+    user_skills_lower = set(s.lower() for s in user_skills)
+    
+    relevant_counts = da_counts if role_category == 'Data Analyst' else ds_counts
+    top_skills = [skill for skill, count in relevant_counts.most_common(top_n)]
+    
+    matched = [s for s in top_skills if s.lower() in user_skills_lower]
+    missing = [s for s in top_skills if s.lower() not in user_skills_lower]
+    
+    match_pct = (len(matched) / top_n) * 100
+    
+    return {
+        'matched_skills': matched,
+        'missing_skills': missing,
+        'match_percentage': match_pct,
+        'total_top_skills': top_n
+    }
 
 if __name__ == '__main__':
     # Locate files relative to script
@@ -81,3 +101,11 @@ if __name__ == '__main__':
     for skill, count in recommendations_2:
         pct = (count / len(clean_df)) * 100
         print(f"  {skill}: appears in {count} postings ({pct:.1f}%)")
+
+    # Test 3: Skill gap summary
+    print("\n" + "="*50)
+    print("SKILL GAP SUMMARY")
+    summary = skill_gap_summary(['Python', 'SQL'], 'Data Scientist', da_counts, ds_counts)
+    print(f"You have {len(summary['matched_skills'])} of the top {summary['total_top_skills']} skills ({summary['match_percentage']:.0f}%)")
+    print(f"Matched: {summary['matched_skills']}")
+    print(f"Missing: {summary['missing_skills']}")
