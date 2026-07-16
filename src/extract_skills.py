@@ -127,3 +127,4 @@ if __name__ == '__main__':
     plt.savefig(chart_path, bbox_inches='tight')
     print(f"\nChart saved to {chart_path}")
     plt.show()
+
