@@ -27,3 +27,15 @@
 ## Next Step
 Proceed to NLP-based skill extraction from job descriptions to identify the 
 most in-demand skills for each role category.
+
+
+## Known Data Limitations
+
+- 12 of 453 postings (2.6%) returned zero extracted skills. Manual review 
+  showed some are genuinely non-technical roles (e.g., a Business Analyst 
+  posting focused on stakeholder management, not technical tools), while 
+  others may have had their requirements section truncated during the 
+  original scrape (90% of all descriptions end in "Show more," a LinkedIn 
+  UI artifact that may sometimes indicate cut-off content). This affects 
+  a small minority of rows and is not expected to materially change 
+  overall skill-demand rankings.
