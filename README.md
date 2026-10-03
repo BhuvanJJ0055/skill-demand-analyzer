@@ -1,20 +1,67 @@
 # Skill-Demand Analyzer
 
-Analyzes real job postings to identify in-demand Data Analyst & Data Scientist skills and recommends a personalized learning path based on skill gaps. Built with Python, SQL, NLP, and deployed as a live app via Streamlit.
+Analyzes real job postings to identify in-demand skills across Data & AI roles (**Data Analyst**, **Data Scientist**, **Data Engineer**, **Machine Learning Engineer**, and **Business Intelligence Analyst**) and recommends a personalized learning roadmap based on skill gaps. Built with Python, NLP, and deployed as an interactive dashboard via Streamlit.
 
-**Live demo:** https://skill-demand-analyzer.streamlit.app/
-**Tech stack:** Python · SQL · NLP (regex-based skill extraction) · Streamlit · Pandas
+**Live demo:** https://skill-demand-analyzer.streamlit.app/  
+**Tech stack:** Python · NLP Skill Extraction · Streamlit · Pandas · python-jobspy
+
+---
 
 ## What it does
-- Analyzes 453 real Data Analyst/Data Scientist job postings (LinkedIn, Apr-Jun 2025)
-- Extracts required skills from job descriptions using a curated 51-skill taxonomy
-- Recommends personalized "skills to learn next" based on your current skillset and target role
-- Shows a skill-match percentage against the top 8 in-demand skills for that role
+- **Multi-Role Coverage:** Analyzes real-world job postings across:
+  - 📊 Data Analyst
+  - 🔬 Data Scientist
+  - 🏗️ Data Engineer
+  - 🤖 Machine Learning / AI Engineer
+  - 📈 Business Intelligence Analyst
+- **Live Ingestion Pipeline:** Uses `python-jobspy` to pull fresh job postings from LinkedIn, Indeed, Glassdoor, and ZipRecruiter with zero API keys required.
+- **Skill Extraction:** Extracts in-demand skills from full descriptions using a curated 60+ skill taxonomy spanning programming languages, cloud platforms, BI tools, data warehouses, and AI/ML frameworks.
+- **Personalized Recommendations:** Calculates benchmark skill match percentages against the top in-demand skills for your chosen role and recommends the exact high-value skills you should learn next.
 
-## Why this dataset
-I compared four datasets and picked this one because it was already focused on Data Analyst/Scientist roles, recent (mid-2025), came from real companies, and was the right size to iterate quickly — versus alternatives that were either too broad, too old, too small after filtering, or partially synthetic.
+---
 
-## Limitations
-- Snapshot data (Apr-Jun 2025) — doesn't reflect real-time market changes
-- Skill extraction uses keyword matching; may miss unusually-phrased skill mentions
-- ~90% of postings contain a "Show more" marker suggesting possible truncation; 8/453 postings returned no detected skills
+## How to Fetch Fresh Job Postings
+
+To refresh your local data with the latest real-world job postings:
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Run the batch scraper:**
+   ```bash
+   python src/fetch_jobs.py --results-wanted 40 --location "United States"
+   ```
+   *Options:*
+   - `--roles`: specify custom search queries (e.g., `--roles "Data Analyst" "Data Scientist"`)
+   - `--location`: target location (e.g., `"United States"`, `"Remote"`, `"London"`)
+   - `--results-wanted`: number of postings per role query (default: 40)
+   - `--hours-old`: job age filter in hours (default: 168 = 7 days)
+   - `--sites`: specific sites to scrape (`linkedin`, `indeed`, `glassdoor`, `zip_recruiter`)
+
+3. **Launch the Streamlit app:**
+   ```bash
+   streamlit run app/app.py
+   ```
+   The app automatically detects fresh postings in `data/processed/latest_jobs_with_skills.csv` (or falls back to the baseline dataset if you haven't fetched live jobs yet).
+
+---
+
+## Architecture
+
+```
+[Job Boards (LinkedIn, Indeed, Glassdoor, ZipRecruiter)]
+                        │
+                        ▼ (batch ingestion via python-jobspy)
+             src/fetch_jobs.py
+                        │
+                        ▼ (raw data saved to data/raw/live_jobs_raw.csv)
+            src/extract_skills.py
+                        │
+                        ▼ (skills extracted via NLP & taxonomy)
+       data/processed/latest_jobs_with_skills.csv
+                        │
+                        ▼
+                 app/app.py (Streamlit UI)
+```

@@ -5,126 +5,137 @@ import pandas as pd
 from collections import Counter
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-
 if script_dir not in sys.path:
     sys.path.append(script_dir)
 
-csv_path = os.path.normpath(os.path.join(script_dir, "../data/processed/da_ds_cleaned.csv"))
-clean_df = pd.read_csv(csv_path)
+try:
+    from src.skills_taxonomy import SKILLS_TAXONOMY
+except ImportError:
+    from skills_taxonomy import SKILLS_TAXONOMY  # type: ignore
 
-from skills_taxonomy import SKILLS_TAXONOMY
 
-def extract_skills(description, skills_list):
-    if not isinstance(description, str):
-        return []
-    description_lower = description.lower()
-    found_skills = []
+def build_skill_patterns(skills_list):
+    """
+    Builds robust compiled regex patterns for skills, handling special characters
+    like 'C++', 'A/B testing', and 'CI/CD' which standard \b word boundaries mishandle.
+    """
+    patterns = {}
     for skill in skills_list:
-        pattern = r'\b' + re.escape(skill.lower()) + r'\b'
-        if re.search(pattern, description_lower):
+        escaped = re.escape(skill.lower())
+        # Custom boundaries handling punctuation/whitespace
+        pattern_str = r'(?:^|[\s,;./()\-[\]{}])' + escaped + r'(?:$|[\s,;./()\-[\]{}])'
+        patterns[skill] = re.compile(pattern_str, re.IGNORECASE)
+    return patterns
+
+COMPILED_SKILL_PATTERNS = build_skill_patterns(SKILLS_TAXONOMY)
+
+def extract_skills(description, skills_list=None):
+    """
+    Extracts known skills from job description text.
+    """
+    if not isinstance(description, str) or not description.strip():
+        return []
+    
+    # Pad string with whitespace to ensure start/end boundaries match cleanly
+    text = f" {description.lower()} "
+    found_skills = []
+    
+    patterns = COMPILED_SKILL_PATTERNS if (skills_list is None or skills_list == SKILLS_TAXONOMY) else build_skill_patterns(skills_list)
+    
+    for skill, pattern in patterns.items():
+        if pattern.search(text):
             found_skills.append(skill)
+            
     return found_skills
 
 def categorize_role(title):
+    """
+    Categorizes job title into primary data & AI role families.
+    """
+    if not isinstance(title, str):
+        return 'Other'
+        
     title_lower = title.lower()
-    if 'data scientist' in title_lower:
+    
+    # Check for ML / AI Engineer first
+    if any(kw in title_lower for kw in [
+        'machine learning', 'ml engineer', 'mlops', 'ai engineer', 
+        'artificial intelligence engineer', 'deep learning'
+    ]):
+        return 'Machine Learning Engineer'
+        
+    # Check for Data Engineer
+    elif any(kw in title_lower for kw in [
+        'data engineer', 'analytics engineer', 'big data engineer', 
+        'etl engineer', 'data platform engineer', 'database engineer'
+    ]):
+        return 'Data Engineer'
+        
+    # Check for Business Intelligence
+    elif any(kw in title_lower for kw in [
+        'business intelligence', 'bi analyst', 'bi developer', 
+        'power bi developer', 'tableau developer', 'bi lead', 'reporting analyst'
+    ]):
+        return 'Business Intelligence Analyst'
+        
+    # Check for Data Scientist
+    elif any(kw in title_lower for kw in [
+        'data scientist', 'applied scientist', 'research scientist', 
+        'decision scientist', 'data science'
+    ]):
         return 'Data Scientist'
-    elif 'data analyst' in title_lower:
+        
+    # Check for Data Analyst
+    elif any(kw in title_lower for kw in [
+        'data analyst', 'analytics analyst', 'product analyst', 
+        'business data analyst', 'quantitative analyst', 'marketing analyst'
+    ]):
         return 'Data Analyst'
+        
     return 'Other'
 
+def enrich_dataframe(df, skills_list=SKILLS_TAXONOMY):
+    """
+    Takes a dataframe containing 'title' and 'description' columns,
+    extracts skills, calculates counts, and assigns role categories.
+    """
+    df = df.copy()
+    if 'description' not in df.columns:
+        raise ValueError("DataFrame must contain a 'description' column")
+    if 'title' not in df.columns:
+        raise ValueError("DataFrame must contain a 'title' column")
+
+    print(f"Extracting skills for {len(df)} postings...")
+    df['extracted_skills'] = df['description'].apply(lambda x: extract_skills(x, skills_list))
+    df['num_skills_found'] = df['extracted_skills'].apply(len)
+    df['role_category'] = df['title'].apply(categorize_role)
+    return df
+
 if __name__ == '__main__':
-    clean_df['extracted_skills'] = clean_df['description'].apply(
-        lambda x: extract_skills(x, SKILLS_TAXONOMY)
-    )
-    clean_df['num_skills_found'] = clean_df['extracted_skills'].apply(len)
-    clean_df['role_category'] = clean_df['title'].apply(categorize_role)
+    # Determine which file to process: prefer latest live jobs if present, else fallback
+    live_raw_path = os.path.normpath(os.path.join(script_dir, "../data/raw/live_jobs_raw.csv"))
+    cleaned_csv_path = os.path.normpath(os.path.join(script_dir, "../data/processed/da_ds_cleaned.csv"))
     
-    print(clean_df['num_skills_found'].describe())
+    if os.path.exists(live_raw_path):
+        input_path = live_raw_path
+        output_path = os.path.normpath(os.path.join(script_dir, "../data/processed/latest_jobs_with_skills.csv"))
+        print(f"Processing live dataset from {input_path}")
+    elif os.path.exists(cleaned_csv_path):
+        input_path = cleaned_csv_path
+        output_path = os.path.normpath(os.path.join(script_dir, "../data/processed/da_ds_with_skills.csv"))
+        print(f"Processing historical dataset from {input_path}")
+    else:
+        print("No input dataset found in data/raw or data/processed.")
+        sys.exit(1)
 
-    print(clean_df[['title', 'extracted_skills']].head(10))
-
-    output_path = os.path.normpath(os.path.join(script_dir, "../data/processed/da_ds_with_skills.csv"))
-    clean_df.to_csv(output_path, index=False)
-    print(f"\nSaved to {output_path}")
-
-    zero_skill_rows = clean_df[clean_df['num_skills_found'] == 0]
-    print(f"Rows with 0 skills found: {len(zero_skill_rows)}")
-    print(zero_skill_rows[['title', 'description']])
+    df = pd.read_csv(input_path)
+    enriched_df = enrich_dataframe(df, SKILLS_TAXONOMY)
     
-    # Look at full descriptions for a few zero-skill rows
-    sample_indices = [idx for idx in [64, 124, 261] if idx in zero_skill_rows.index]
-    if not sample_indices:
-        sample_indices = list(zero_skill_rows.index[:3])
-        
-    for idx in sample_indices:
-        print(f"\n{'='*60}")
-        print(f"Title: {clean_df.loc[idx, 'title']}")
-        print(clean_df.loc[idx, 'description'])
-
-    # How many descriptions end with "Show more" (indicating truncation)?
-    truncated = clean_df[clean_df['description'].str.strip().str.endswith('Show more')]
-    print(f"Descriptions ending in 'Show more': {len(truncated)} out of {len(clean_df)}")
-    print(f"Percentage: {len(truncated)/len(clean_df)*100:.1f}%")
-
-    # Cross-check: what % of the 0-skill rows specifically end this way?
-    zero_truncated = zero_skill_rows[zero_skill_rows['description'].str.strip().str.endswith('Show more')]
-    print(f"\nOf the {len(zero_skill_rows)} zero-skill rows, {len(zero_truncated)} end with 'Show more'")
-
-    # Flatten all extracted skills into one big list, then count frequency
-    all_skills = [skill for skills_list in clean_df['extracted_skills'] for skill in skills_list]
-    skill_counts = Counter(all_skills)
+    enriched_df.to_csv(output_path, index=False)
+    print(f"\nSaved enriched data with skills to {output_path}")
     
-    print("\n=== TOP 20 SKILLS OVERALL ===")
-    for skill, count in skill_counts.most_common(20):
-        pct = (count / len(clean_df)) * 100
-        print(f"{skill:20s} {count:4d} postings  ({pct:.1f}%)")
+    print("\nRole distribution:")
+    print(enriched_df['role_category'].value_counts())
     
-    # Break down by role: Data Analyst vs Data Scientist
-    print("\n=== TOP 10 SKILLS — DATA ANALYST ROLES ===")
-    da_skills = [skill for skills_list in clean_df[clean_df['role_category']=='Data Analyst']['extracted_skills'] for skill in skills_list]
-    da_counts = Counter(da_skills)
-    for skill, count in da_counts.most_common(10):
-        print(f"{skill:20s} {count:4d}")
-    
-    print("\n=== TOP 10 SKILLS — DATA SCIENTIST ROLES ===")
-    ds_skills = [skill for skills_list in clean_df[clean_df['role_category']=='Data Scientist']['extracted_skills'] for skill in skills_list]
-    ds_counts = Counter(ds_skills)
-    for skill, count in ds_counts.most_common(10):
-        print(f"{skill:20s} {count:4d}")
-
-    # --- Chart 5: DA vs DS skill comparison ---
-    import matplotlib.pyplot as plt
-
-    top_da = dict(da_counts.most_common(8))
-    top_ds = dict(ds_counts.most_common(8))
-
-    all_top_skills = list(set(list(top_da.keys()) + list(top_ds.keys())))
-    # Sort skills by total frequency (descending) to make the chart easier to scan
-    all_top_skills.sort(key=lambda s: da_counts.get(s, 0) + ds_counts.get(s, 0), reverse=True)
-    
-    # Retrieve actual counts from full counters instead of top 8 dicts to avoid misleading 0s
-    da_vals = [da_counts.get(s, 0) for s in all_top_skills]
-    ds_vals = [ds_counts.get(s, 0) for s in all_top_skills]
-
-    x = range(len(all_top_skills))
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - 0.2 for i in x], da_vals, width=0.4, label='Data Analyst', color='#4C72B0')
-    plt.bar([i + 0.2 for i in x], ds_vals, width=0.4, label='Data Scientist', color='#DD8452')
-    plt.xticks(x, all_top_skills, rotation=45, ha='right')
-    plt.ylabel('Number of Postings')
-    plt.title('Top Skills: Data Analyst vs Data Scientist')
-    plt.legend()
-    
-    # Add caption explaining the data representation and resolving the "0" bars nuance
-    plt.figtext(0.5, -0.05, 
-                "Note: Includes the union of the top 8 skills from each role. True counts are shown for both roles, even if the skill wasn't in that role's own top 8.",
-                ha='center', fontsize=8, style='italic', wrap=True)
-    
-    plt.tight_layout()
-
-    chart_path = os.path.normpath(os.path.join(script_dir, "../notebooks/chart5_skill_comparison.png"))
-    plt.savefig(chart_path, bbox_inches='tight')
-    print(f"\nChart saved to {chart_path}")
-    plt.show()
-
+    print("\nSummary of skills found per posting:")
+    print(enriched_df['num_skills_found'].describe())
