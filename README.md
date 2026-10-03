@@ -17,6 +17,11 @@ Analyzes real job postings to identify in-demand skills across Data & AI roles (
 - **Live Ingestion Pipeline:** Uses `python-jobspy` to pull fresh job postings from LinkedIn, Indeed, Glassdoor, and ZipRecruiter with zero API keys required.
 - **Skill Extraction:** Extracts in-demand skills from full descriptions using a curated 60+ skill taxonomy spanning programming languages, cloud platforms, BI tools, data warehouses, and AI/ML frameworks.
 - **Personalized Recommendations:** Calculates benchmark skill match percentages against the top in-demand skills for your chosen role and recommends the exact high-value skills you should learn next.
+- **Curated Learning Paths:** For each missing skill, provides:
+  - 🌐 **Official Documentation:** Direct links to official technical docs (PostgreSQL, Python, Power BI, AWS, PyTorch, etc.).
+  - 📺 **Top YouTube Channels:** Hand-picked educators (Alex The Analyst, Corey Schafer, StatQuest, Guy in a Cube, Andrej Karpathy, etc.).
+  - 🔍 **YouTube Course Search:** Instant 1-click links to search beginner-friendly tutorials.
+- **Fresher Job Openings:** Automatically filters and showcases entry-level, junior, associate, and 0-2 year experience job postings with direct clickable application links.
 
 ---
 
